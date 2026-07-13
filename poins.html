@@ -1,1 +1,113 @@
+    -Math.cos(car.heading)*camDist
+  );
+  const desired = car.mesh.position.clone().add(behind);
+  car.camera.position.lerp(desired, 0.12);
+  const lookAt = car.mesh.position.clone().add(new THREE.Vector3(0,1,0));
+  car.camera.lookAt(lookAt);
+}
 
+/* =========================================================
+   HUD تحديث
+========================================================= */
+const hudLapEls = [document.getElementById('p1lap'),document.getElementById('p2lap'),document.getElementById('p3lap'),document.getElementById('p4lap')];
+function updateHUD(){
+  cars.forEach((car,i)=>{
+    hudLapEls[i].textContent = `اللفة: ${Math.min(car.laps,lapsRequired)}/${lapsRequired}`;
+  });
+  document.getElementById('lvlNum').textContent = level;
+  document.getElementById('lvlSub').textContent = `${lapsRequired} لفات للفوز`;
+}
+
+/* =========================================================
+   حلقة اللعبة
+========================================================= */
+function onWindowResize(){
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onWindowResize);
+
+function animate(){
+  requestAnimationFrame(animate);
+  if(!started) { renderer.render(scene, cars.length? cars[0].camera : new THREE.PerspectiveCamera()); return; }
+
+  if(!raceOver){
+    cars.forEach(updateCar);
+  }
+  cars.forEach(updateCamera);
+
+  updateHUD();
+
+  const w = window.innerWidth, h = window.innerHeight;
+  const halfW = w/2, halfH = h/2;
+  const viewports = [
+    {x:0, y:halfH, w:halfW, h:halfH},        // top-left  -> player1
+    {x:halfW, y:halfH, w:halfW, h:halfH},    // top-right -> player2
+    {x:0, y:0, w:halfW, h:halfH},            // bottom-left -> player3
+    {x:halfW, y:0, w:halfW, h:halfH},        // bottom-right -> player4
+  ];
+
+  renderer.setScissorTest(true);
+  cars.forEach((car,i)=>{
+    const vp = viewports[i];
+    renderer.setViewport(vp.x, vp.y, vp.w, vp.h);
+    renderer.setScissor(vp.x, vp.y, vp.w, vp.h);
+    car.camera.aspect = vp.w/vp.h;
+    car.camera.updateProjectionMatrix();
+    renderer.render(scene, car.camera);
+  });
+  renderer.setScissorTest(false);
+}
+
+/* =========================================================
+   إدارة المستويات والشاشات
+========================================================= */
+function startLevel(lvl){
+  level = lvl;
+  raceOver = false;
+  generateTrack(level);
+  if(cars.length===0) createCars(); else cars.forEach(c=>scene.add(c.mesh));
+  placeCarsAtStart();
+  document.getElementById('topBar').classList.remove('hidden');
+}
+
+function onLevelWon(winnerCar){
+  setTimeout(()=>{
+    document.getElementById('finishedLvl').textContent = level;
+    const tag = document.getElementById('winnerTag');
+    tag.textContent = `🏆 فاز ${winnerCar.def.name}!`;
+    tag.style.background = '#'+winnerCar.def.color.toString(16).padStart(6,'0');
+    tag.style.color = '#111';
+
+    let scoresText = cars.map(c=>`${c.def.name}: ${Math.min(c.laps,lapsRequired)} لفة`).join(' | ');
+    document.getElementById('finalScoresText').textContent = scoresText;
+
+    if(level >= MAX_LEVEL){
+      document.getElementById('ultimateWinnerTag').textContent = `آخر بطل: ${winnerCar.def.name} 🎉`;
+      document.getElementById('ultimateWinnerTag').style.background = '#'+winnerCar.def.color.toString(16).padStart(6,'0');
+      document.getElementById('gameCompleteScreen').classList.remove('hidden');
+    } else {
+      document.getElementById('levelCompleteScreen').classList.remove('hidden');
+    }
+  }, 400);
+}
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  document.getElementById('startScreen').classList.add('hidden');
+  started = true;
+  startLevel(1);
+});
+
+document.getElementById('nextLevelBtn').addEventListener('click', ()=>{
+  document.getElementById('levelCompleteScreen').classList.add('hidden');
+  startLevel(level+1);
+});
+
+document.getElementById('restartBtn').addEventListener('click', ()=>{
+  document.getElementById('gameCompleteScreen').classList.add('hidden');
+  startLevel(1);
+});
+
+animate();
+</script>
+</body>
+</html>
